@@ -327,6 +327,11 @@ Usage: `/gsd:set-profile budget`
 **`/gsd:help`**
 Show this command reference.
 
+**`/gsd:clear`**
+Start a fresh Codex CLI session (context reset guidance).
+
+Usage: `/gsd:clear`
+
 **`/gsd:update`**
 Update GSD to latest version with changelog preview.
 
