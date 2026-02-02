@@ -5,34 +5,60 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { execSync, spawn } = require('child_process');
+const { spawn } = require('child_process');
 
 const homeDir = os.homedir();
-const cacheDir = path.join(homeDir, '.claude', 'cache');
+const cwd = process.cwd();
+
+function expandTilde(filePath) {
+  if (filePath && filePath.startsWith('~/')) {
+    return path.join(homeDir, filePath.slice(2));
+  }
+  return filePath;
+}
+
+const configDir = process.env.CODEX_CONFIG_DIR
+  ? expandTilde(process.env.CODEX_CONFIG_DIR)
+  : path.join(homeDir, '.codex');
+
+const cacheDir = path.join(configDir, 'cache');
 const cacheFile = path.join(cacheDir, 'gsd-update-check.json');
-const versionFile = path.join(homeDir, '.claude', 'get-shit-done', 'VERSION');
+
+// VERSION file locations (check project first, then global)
+const projectVersionFile = path.join(cwd, 'get-shit-done', 'VERSION');
+const projectAltVersionFile = path.join(cwd, '.codex', 'get-shit-done', 'VERSION');
+const globalVersionFile = path.join(configDir, 'get-shit-done', 'VERSION');
 
 // Ensure cache directory exists
 if (!fs.existsSync(cacheDir)) {
   fs.mkdirSync(cacheDir, { recursive: true });
 }
 
-// Run check in background (spawn detached process)
+// Run check in background (spawn background process, windowsHide prevents console flash)
 const child = spawn(process.execPath, ['-e', `
   const fs = require('fs');
   const { execSync } = require('child_process');
 
   const cacheFile = ${JSON.stringify(cacheFile)};
-  const versionFile = ${JSON.stringify(versionFile)};
+  const projectVersionFile = ${JSON.stringify(projectVersionFile)};
+  const projectAltVersionFile = ${JSON.stringify(projectAltVersionFile)};
+  const globalVersionFile = ${JSON.stringify(globalVersionFile)};
 
+  // Check project directory first (local install), then global
   let installed = '0.0.0';
   try {
-    installed = fs.readFileSync(versionFile, 'utf8').trim();
+    if (fs.existsSync(projectVersionFile)) {
+      installed = fs.readFileSync(projectVersionFile, 'utf8').trim();
+    } else if (fs.existsSync(projectAltVersionFile)) {
+      installed = fs.readFileSync(projectAltVersionFile, 'utf8').trim();
+    } else if (fs.existsSync(globalVersionFile)) {
+      installed = fs.readFileSync(globalVersionFile, 'utf8').trim();
+    }
   } catch (e) {}
 
   let latest = null;
   try {
-    latest = execSync('npm view get-shit-done-cc version', { encoding: 'utf8', timeout: 10000 }).trim();
+    latest = execSync('npm view @undeemed/get-shit-done-codex version', { encoding: 'utf8', timeout: 10000, windowsHide: true }).trim();
   } catch (e) {}
 
   const result = {
@@ -44,8 +70,8 @@ const child = spawn(process.execPath, ['-e', `
 
   fs.writeFileSync(cacheFile, JSON.stringify(result));
 `], {
-  detached: true,
-  stdio: 'ignore'
+  stdio: 'ignore',
+  windowsHide: true
 });
 
 child.unref();

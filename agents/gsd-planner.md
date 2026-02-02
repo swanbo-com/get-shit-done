@@ -809,8 +809,8 @@ Triggered by `--gaps` flag. Creates plans to address verification or UAT failure
 
 ```bash
 # Match both zero-padded (05-*) and unpadded (5-*) folders
-PADDED_PHASE=$(printf "%02d" ${PHASE_ARG} 2>/dev/null || echo "${PHASE_ARG}")
-PHASE_DIR=$(ls -d .planning/phases/${PADDED_PHASE}-* .planning/phases/${PHASE_ARG}-* 2>/dev/null | head -1)
+PADDED_PHASE=$(printf "%02d" $PHASE_ARG 2>/dev/null || echo "$PHASE_ARG")
+PHASE_DIR=$(ls -d .planning/phases/$PADDED_PHASE-* .planning/phases/$PHASE_ARG-* 2>/dev/null | head -1)
 
 # Check for VERIFICATION.md (code verification gaps)
 ls "$PHASE_DIR"/*-VERIFICATION.md 2>/dev/null
@@ -889,7 +889,7 @@ Triggered when orchestrator provides `<revision_context>` with checker issues. Y
 Read all PLAN.md files in the phase directory:
 
 ```bash
-cat .planning/phases/${PHASE}-*/*-PLAN.md
+cat .planning/phases/$PHASE-*/*-PLAN.md
 ```
 
 Build mental model of:
@@ -953,9 +953,13 @@ After making edits, self-check:
 
 ### Step 6: Commit Revised Plans
 
+**If `COMMIT_PLANNING_DOCS=false`:** Skip git operations, log "Skipping planning docs commit (commit_docs: false)"
+
+**If `COMMIT_PLANNING_DOCS=true` (default):**
+
 ```bash
-git add .planning/phases/${PHASE}-*/${PHASE}-*-PLAN.md
-git commit -m "fix(${PHASE}): revise plans based on checker feedback"
+git add .planning/phases/$PHASE-*/$PHASE-*-PLAN.md
+git commit -m "fix($PHASE): revise plans based on checker feedback"
 ```
 
 ### Step 7: Return Revision Summary
@@ -998,6 +1002,17 @@ Read `.planning/STATE.md` and parse:
 - Blockers/concerns (things this phase may address)
 
 If STATE.md missing but .planning/ exists, offer to reconstruct or continue without.
+
+**Load planning config:**
+
+```bash
+# Check if planning docs should be committed (default: true)
+COMMIT_PLANNING_DOCS=$(cat .planning/config.json 2>/dev/null | grep -o '"commit_docs"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "true")
+# Auto-detect gitignored (overrides config)
+git check-ignore -q .planning 2>/dev/null && COMMIT_PLANNING_DOCS=false
+```
+
+Store `COMMIT_PLANNING_DOCS` for use in git operations.
 </step>
 
 <step name="load_codebase_context">
@@ -1079,17 +1094,17 @@ Understand:
 
 ```bash
 # Match both zero-padded (05-*) and unpadded (5-*) folders
-PADDED_PHASE=$(printf "%02d" ${PHASE} 2>/dev/null || echo "${PHASE}")
-PHASE_DIR=$(ls -d .planning/phases/${PADDED_PHASE}-* .planning/phases/${PHASE}-* 2>/dev/null | head -1)
+PADDED_PHASE=$(printf "%02d" $PHASE 2>/dev/null || echo "$PHASE")
+PHASE_DIR=$(ls -d .planning/phases/$PADDED_PHASE-* .planning/phases/$PHASE-* 2>/dev/null | head -1)
 
 # Read CONTEXT.md if exists (from /gsd:discuss-phase)
-cat "${PHASE_DIR}"/*-CONTEXT.md 2>/dev/null
+cat "$PHASE_DIR"/*-CONTEXT.md 2>/dev/null
 
 # Read RESEARCH.md if exists (from /gsd:research-phase)
-cat "${PHASE_DIR}"/*-RESEARCH.md 2>/dev/null
+cat "$PHASE_DIR"/*-RESEARCH.md 2>/dev/null
 
 # Read DISCOVERY.md if exists (from mandatory discovery)
-cat "${PHASE_DIR}"/*-DISCOVERY.md 2>/dev/null
+cat "$PHASE_DIR"/*-DISCOVERY.md 2>/dev/null
 ```
 
 **If CONTEXT.md exists:** Honor user's vision, prioritize their essential features, respect stated boundaries. These are locked decisions - do not revisit.
@@ -1209,11 +1224,15 @@ Update ROADMAP.md to finalize phase placeholders created by add-phase or insert-
 <step name="git_commit">
 Commit phase plan(s) and updated roadmap:
 
-```bash
-git add .planning/phases/${PHASE}-*/${PHASE}-*-PLAN.md .planning/ROADMAP.md
-git commit -m "docs(${PHASE}): create phase plan
+**If `COMMIT_PLANNING_DOCS=false`:** Skip git operations, log "Skipping planning docs commit (commit_docs: false)"
 
-Phase ${PHASE}: ${PHASE_NAME}
+**If `COMMIT_PLANNING_DOCS=true` (default):**
+
+```bash
+git add .planning/phases/$PHASE-*/$PHASE-*-PLAN.md .planning/ROADMAP.md
+git commit -m "docs($PHASE): create phase plan
+
+Phase $PHASE: $PHASE_NAME
 - [N] plan(s) in [M] wave(s)
 - [X] parallel, [Y] sequential
 - Ready for execution"

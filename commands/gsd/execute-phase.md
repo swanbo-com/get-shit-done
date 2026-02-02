@@ -38,6 +38,24 @@ Phase: $ARGUMENTS
 </context>
 
 <process>
+0. **Resolve Model Profile**
+
+   Read model profile for agent spawning:
+   ```bash
+   MODEL_PROFILE=$(cat .planning/config.json 2>/dev/null | grep -o '"model_profile"[[:space:]]*:[[:space:]]*"[^"]*"' | grep -o '"[^"]*"$' | tr -d '"' || echo "balanced")
+   ```
+
+   Default to "balanced" if not set.
+
+   **Model lookup table:**
+
+   | Agent | quality | balanced | budget |
+   |-------|---------|----------|--------|
+   | gsd-executor | opus | sonnet | sonnet |
+   | gsd-verifier | sonnet | sonnet | haiku |
+
+   Store resolved models for use in Task calls below.
+
 1. **Validate phase exists**
    - Find phase directory matching argument
    - Count PLAN.md files
@@ -79,6 +97,11 @@ Phase: $ARGUMENTS
    **If clean:** Continue to verification.
 
 7. **Verify phase goal**
+   Check config: `WORKFLOW_VERIFIER=$(cat .planning/config.json 2>/dev/null | grep -o '"verifier"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "true")`
+
+   **If `workflow.verifier` is `false`:** Skip to step 8 (treat as passed).
+
+   **Otherwise:**
    - Spawn `gsd-verifier` subagent with phase directory and goal
    - Verifier checks must_haves against actual codebase (not SUMMARY claims)
    - Creates VERIFICATION.md with detailed report
@@ -99,7 +122,9 @@ Phase: $ARGUMENTS
    - Skip if: REQUIREMENTS.md doesn't exist, or phase has no Requirements line
 
 10. **Commit phase completion**
-    Bundle all phase metadata updates in one commit:
+    Check `COMMIT_PLANNING_DOCS` from config.json (default: true).
+    If false: Skip git operations for .planning/ files.
+    If true: Bundle all phase metadata updates in one commit:
     - Stage: `git add .planning/ROADMAP.md .planning/STATE.md`
     - Stage REQUIREMENTS.md if updated: `git add .planning/REQUIREMENTS.md`
     - Commit: `docs({phase}): complete {phase-name} phase`
@@ -123,7 +148,7 @@ Output this markdown directly (not as a code block). Route based on status:
 **Route A: Phase verified, more phases remain**
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- GSD-CODEX ► PHASE {Z} COMPLETE ✓
+ GSD ► PHASE {Z} COMPLETE ✓
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 **Phase {Z}: {Name}**
@@ -154,7 +179,7 @@ Goal verified ✓
 **Route B: Phase verified, milestone complete**
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- GSD-CODEX ► MILESTONE COMPLETE 🎉
+ GSD ► MILESTONE COMPLETE 🎉
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 **v1.0**
@@ -185,7 +210,7 @@ All phase goals verified ✓
 **Route C: Gaps found — need additional planning**
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- GSD-CODEX ► PHASE {Z} GAPS FOUND ⚠
+ GSD ► PHASE {Z} GAPS FOUND ⚠
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 **Phase {Z}: {Name}**
@@ -228,12 +253,22 @@ After user runs /gsd:plan-phase {Z} --gaps:
 <wave_execution>
 **Parallel spawning:**
 
-Spawn all plans in a wave with a single message containing multiple Task calls:
+Before spawning, read file contents. The `@` syntax does not work across Task() boundaries.
+
+```bash
+# Read each plan and STATE.md
+PLAN_01_CONTENT=$(cat "{plan_01_path}")
+PLAN_02_CONTENT=$(cat "{plan_02_path}")
+PLAN_03_CONTENT=$(cat "{plan_03_path}")
+STATE_CONTENT=$(cat .planning/STATE.md)
+```
+
+Spawn all plans in a wave with a single message containing multiple Task calls, with inlined content:
 
 ```
-Task(prompt="Execute plan at {plan_01_path}\n\nPlan: @{plan_01_path}\nProject state: @.planning/STATE.md", subagent_type="gsd-executor")
-Task(prompt="Execute plan at {plan_02_path}\n\nPlan: @{plan_02_path}\nProject state: @.planning/STATE.md", subagent_type="gsd-executor")
-Task(prompt="Execute plan at {plan_03_path}\n\nPlan: @{plan_03_path}\nProject state: @.planning/STATE.md", subagent_type="gsd-executor")
+Task(prompt="Execute plan at {plan_01_path}\n\nPlan:\n{plan_01_content}\n\nProject state:\n{state_content}", subagent_type="gsd-executor", model="{executor_model}")
+Task(prompt="Execute plan at {plan_02_path}\n\nPlan:\n{plan_02_content}\n\nProject state:\n{state_content}", subagent_type="gsd-executor", model="{executor_model}")
+Task(prompt="Execute plan at {plan_03_path}\n\nPlan:\n{plan_03_content}\n\nProject state:\n{state_content}", subagent_type="gsd-executor", model="{executor_model}")
 ```
 
 All three run in parallel. Task tool blocks until all complete.

@@ -93,7 +93,7 @@ timestamp=$(date "+%Y-%m-%dT%H:%M")
 date_prefix=$(date "+%Y-%m-%d")
 ```
 
-Generate slug from title (lowercase, hyphens, no special chars).
+Generate slug from title (lowercase, hyphens, no special chars in FILENAME only).
 
 Write to `.planning/todos/pending/${date_prefix}-${slug}.md`:
 
@@ -125,6 +125,17 @@ If `.planning/STATE.md` exists:
 
 <step name="git_commit">
 Commit the todo and any updated state:
+
+**Check planning config:**
+
+```bash
+COMMIT_PLANNING_DOCS=$(cat .planning/config.json 2>/dev/null | grep -o '"commit_docs"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "true")
+git check-ignore -q .planning 2>/dev/null && COMMIT_PLANNING_DOCS=false
+```
+
+**If `COMMIT_PLANNING_DOCS=false`:** Skip git operations, log "Todo saved (not committed - commit_docs: false)"
+
+**If `COMMIT_PLANNING_DOCS=true` (default):**
 
 ```bash
 git add .planning/todos/pending/[filename]

@@ -106,15 +106,15 @@ STOP here if ahead.
 ────────────────────────────────────────────────────────────
 
 ⚠️  **Note:** The installer performs a clean install of GSD folders:
-- `~/.claude/commands/gsd/` will be wiped and replaced
+- `~/.claude/prompts/gsd-*.md` will be wiped and replaced
 - `~/.claude/get-shit-done/` will be wiped and replaced
 - `~/.claude/agents/gsd-*` files will be replaced
 
 Your custom files in other locations are preserved:
-- Custom commands in `~/.claude/commands/your-stuff/` ✓
+- Custom prompts in `~/.claude/prompts/` (non `gsd-` prefixed) ✓
 - Custom agents not prefixed with `gsd-` ✓
 - Custom hooks ✓
-- Your CLAUDE.md files ✓
+- Your AGENTS.md files ✓
 
 If you've modified any GSD files directly, back them up first.
 ```

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Claude Code Statusline - GSD Edition
+// Codex CLI Statusline - GSD Edition
 // Shows: model | current task | directory | context usage
 
 const fs = require('fs');
@@ -13,27 +13,30 @@ process.stdin.on('data', chunk => input += chunk);
 process.stdin.on('end', () => {
   try {
     const data = JSON.parse(input);
-    const model = data.model?.display_name || 'Claude';
+    const model = data.model?.display_name || 'Codex';
     const dir = data.workspace?.current_dir || process.cwd();
     const session = data.session_id || '';
     const remaining = data.context_window?.remaining_percentage;
 
-    // Context window display (shows USED percentage)
+    // Context window display (shows USED percentage scaled to 80% limit)
+    // Claude Code enforces an 80% context limit, so we scale to show 100% at that point
     let ctx = '';
     if (remaining != null) {
       const rem = Math.round(remaining);
-      const used = 100 - rem;
+      const rawUsed = Math.max(0, Math.min(100, 100 - rem));
+      // Scale: 80% real usage = 100% displayed
+      const used = Math.min(100, Math.round((rawUsed / 80) * 100));
 
       // Build progress bar (10 segments)
       const filled = Math.floor(used / 10);
       const bar = '█'.repeat(filled) + '░'.repeat(10 - filled);
 
-      // Color based on usage
-      if (used < 50) {
+      // Color based on scaled usage (thresholds adjusted for new scale)
+      if (used < 63) {        // ~50% real
         ctx = ` \x1b[32m${bar} ${used}%\x1b[0m`;
-      } else if (used < 65) {
+      } else if (used < 81) { // ~65% real
         ctx = ` \x1b[33m${bar} ${used}%\x1b[0m`;
-      } else if (used < 80) {
+      } else if (used < 95) { // ~76% real
         ctx = ` \x1b[38;5;208m${bar} ${used}%\x1b[0m`;
       } else {
         ctx = ` \x1b[5;31m💀 ${bar} ${used}%\x1b[0m`;
@@ -43,7 +46,16 @@ process.stdin.on('end', () => {
     // Current task from todos
     let task = '';
     const homeDir = os.homedir();
-    const todosDir = path.join(homeDir, '.claude', 'todos');
+    const expandTilde = (filePath) => {
+      if (filePath && filePath.startsWith('~/')) {
+        return path.join(homeDir, filePath.slice(2));
+      }
+      return filePath;
+    };
+    const configDir = process.env.CODEX_CONFIG_DIR
+      ? expandTilde(process.env.CODEX_CONFIG_DIR)
+      : path.join(homeDir, '.codex');
+    const todosDir = path.join(configDir, 'todos');
     if (session && fs.existsSync(todosDir)) {
       const files = fs.readdirSync(todosDir)
         .filter(f => f.startsWith(session) && f.includes('-agent-') && f.endsWith('.json'))
@@ -61,12 +73,12 @@ process.stdin.on('end', () => {
 
     // GSD update available?
     let gsdUpdate = '';
-    const cacheFile = path.join(homeDir, '.claude', 'cache', 'gsd-update-check.json');
+    const cacheFile = path.join(configDir, 'cache', 'gsd-update-check.json');
     if (fs.existsSync(cacheFile)) {
       try {
         const cache = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
         if (cache.update_available) {
-          gsdUpdate = '\x1b[33m⬆ /gsd:update\x1b[0m │ ';
+          gsdUpdate = '\x1b[33m⬆ /prompts:gsd-update\x1b[0m │ ';
         }
       } catch (e) {}
     }

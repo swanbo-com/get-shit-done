@@ -97,7 +97,7 @@ Exit command.
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- GSD-CODEX ► QUESTIONING
+ GSD ► QUESTIONING
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
@@ -237,7 +237,7 @@ EOF
 
 ## Phase 5: Workflow Preferences
 
-Ask all workflow preferences in a single AskUserQuestion call (3 questions):
+**Round 1 — Core workflow settings (4 questions):**
 
 ```
 questions: [
@@ -268,11 +268,96 @@ questions: [
       { label: "Parallel (Recommended)", description: "Independent plans run simultaneously" },
       { label: "Sequential", description: "One plan at a time" }
     ]
+  },
+  {
+    header: "Git Tracking",
+    question: "Commit planning docs to git?",
+    multiSelect: false,
+    options: [
+      { label: "Yes (Recommended)", description: "Planning docs tracked in version control" },
+      { label: "No", description: "Keep .planning/ local-only (add to .gitignore)" }
+    ]
   }
 ]
 ```
 
-Create `.planning/config.json` with chosen mode, depth, and parallelization.
+**Round 2 — Workflow agents:**
+
+These spawn additional agents during planning/execution. They add tokens and time but improve quality.
+
+| Agent | When it runs | What it does |
+|-------|--------------|--------------|
+| **Researcher** | Before planning each phase | Investigates domain, finds patterns, surfaces gotchas |
+| **Plan Checker** | After plan is created | Verifies plan actually achieves the phase goal |
+| **Verifier** | After phase execution | Confirms must-haves were delivered |
+
+All recommended for important projects. Skip for quick experiments.
+
+```
+questions: [
+  {
+    header: "Research",
+    question: "Research before planning each phase? (adds tokens/time)",
+    multiSelect: false,
+    options: [
+      { label: "Yes (Recommended)", description: "Investigate domain, find patterns, surface gotchas" },
+      { label: "No", description: "Plan directly from requirements" }
+    ]
+  },
+  {
+    header: "Plan Check",
+    question: "Verify plans will achieve their goals? (adds tokens/time)",
+    multiSelect: false,
+    options: [
+      { label: "Yes (Recommended)", description: "Catch gaps before execution starts" },
+      { label: "No", description: "Execute plans without verification" }
+    ]
+  },
+  {
+    header: "Verifier",
+    question: "Verify work satisfies requirements after each phase? (adds tokens/time)",
+    multiSelect: false,
+    options: [
+      { label: "Yes (Recommended)", description: "Confirm deliverables match phase goals" },
+      { label: "No", description: "Trust execution, skip verification" }
+    ]
+  },
+  {
+    header: "Model Profile",
+    question: "Which AI models for planning agents?",
+    multiSelect: false,
+    options: [
+      { label: "Balanced (Recommended)", description: "gpt-5.2-codex for planning, gpt-5.1-codex(-mini) for most agents" },
+      { label: "Quality", description: "gpt-5.2-codex everywhere — highest cost, deepest analysis" },
+      { label: "Budget", description: "gpt-5.1-codex-mini where possible — fastest, lowest cost" }
+    ]
+  }
+]
+```
+
+Create `.planning/config.json` with all settings:
+
+```json
+{
+  "mode": "yolo|interactive",
+  "depth": "quick|standard|comprehensive",
+  "parallelization": true|false,
+  "commit_docs": true|false,
+  "model_profile": "quality|balanced|budget",
+  "workflow": {
+    "research": true|false,
+    "plan_check": true|false,
+    "verifier": true|false
+  }
+}
+```
+
+**If commit_docs = No:**
+- Set `commit_docs: false` in config.json
+- Add `.planning/` to `.gitignore` (create if needed)
+
+**If commit_docs = Yes:**
+- No additional gitignore entries needed
 
 **Commit config.json:**
 
@@ -284,9 +369,32 @@ chore: add project config
 Mode: [chosen mode]
 Depth: [chosen depth]
 Parallelization: [enabled/disabled]
+Workflow agents: research=[on/off], plan_check=[on/off], verifier=[on/off]
 EOF
 )"
 ```
+
+**Note:** Run `/gsd:settings` anytime to update these preferences.
+
+## Phase 5.5: Resolve Model Profile
+
+Read model profile for agent spawning:
+
+```bash
+MODEL_PROFILE=$(cat .planning/config.json 2>/dev/null | grep -o '"model_profile"[[:space:]]*:[[:space:]]*"[^"]*"' | grep -o '"[^"]*"$' | tr -d '"' || echo "balanced")
+```
+
+Default to "balanced" if not set.
+
+**Model lookup table:**
+
+| Agent | quality | balanced | budget |
+|-------|---------|----------|--------|
+| gsd-project-researcher | gpt-5.2-codex | gpt-5.1-codex-mini | gpt-5.1-codex-mini |
+| gsd-research-synthesizer | gpt-5.2-codex | gpt-5.1-codex | gpt-5.1-codex-mini |
+| gsd-roadmapper | gpt-5.2-codex | gpt-5.1-codex | gpt-5.1-codex-mini |
+
+Store resolved models for use in Task calls below.
 
 ## Phase 6: Research Decision
 
@@ -302,7 +410,7 @@ Use AskUserQuestion:
 Display stage banner:
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- GSD-CODEX ► RESEARCHING
+ GSD ► RESEARCHING
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Researching [domain] ecosystem...
@@ -331,7 +439,8 @@ Display spawning indicator:
 Spawn 4 parallel gsd-project-researcher agents with rich context:
 
 ```
-Task(prompt="
+Task(prompt="First, read ~/.claude/agents/gsd-project-researcher.md for your role and instructions.
+
 <research_type>
 Project Research — Stack dimension for [domain].
 </research_type>
@@ -368,9 +477,10 @@ Your STACK.md feeds into roadmap creation. Be prescriptive:
 Write to: .planning/research/STACK.md
 Use template: ~/.claude/get-shit-done/templates/research-project/STACK.md
 </output>
-", subagent_type="gsd-project-researcher", description="Stack research")
+", subagent_type="general-purpose", model="{researcher_model}", description="Stack research")
 
-Task(prompt="
+Task(prompt="First, read ~/.claude/agents/gsd-project-researcher.md for your role and instructions.
+
 <research_type>
 Project Research — Features dimension for [domain].
 </research_type>
@@ -407,9 +517,10 @@ Your FEATURES.md feeds into requirements definition. Categorize clearly:
 Write to: .planning/research/FEATURES.md
 Use template: ~/.claude/get-shit-done/templates/research-project/FEATURES.md
 </output>
-", subagent_type="gsd-project-researcher", description="Features research")
+", subagent_type="general-purpose", model="{researcher_model}", description="Features research")
 
-Task(prompt="
+Task(prompt="First, read ~/.claude/agents/gsd-project-researcher.md for your role and instructions.
+
 <research_type>
 Project Research — Architecture dimension for [domain].
 </research_type>
@@ -446,9 +557,10 @@ Your ARCHITECTURE.md informs phase structure in roadmap. Include:
 Write to: .planning/research/ARCHITECTURE.md
 Use template: ~/.claude/get-shit-done/templates/research-project/ARCHITECTURE.md
 </output>
-", subagent_type="gsd-project-researcher", description="Architecture research")
+", subagent_type="general-purpose", model="{researcher_model}", description="Architecture research")
 
-Task(prompt="
+Task(prompt="First, read ~/.claude/agents/gsd-project-researcher.md for your role and instructions.
+
 <research_type>
 Project Research — Pitfalls dimension for [domain].
 </research_type>
@@ -485,7 +597,7 @@ Your PITFALLS.md prevents mistakes in roadmap/planning. For each pitfall:
 Write to: .planning/research/PITFALLS.md
 Use template: ~/.claude/get-shit-done/templates/research-project/PITFALLS.md
 </output>
-", subagent_type="gsd-project-researcher", description="Pitfalls research")
+", subagent_type="general-purpose", model="{researcher_model}", description="Pitfalls research")
 ```
 
 After all 4 agents complete, spawn synthesizer to create SUMMARY.md:
@@ -509,13 +621,13 @@ Write to: .planning/research/SUMMARY.md
 Use template: ~/.claude/get-shit-done/templates/research-project/SUMMARY.md
 Commit after writing.
 </output>
-", subagent_type="gsd-research-synthesizer", description="Synthesize research")
+", subagent_type="gsd-research-synthesizer", model="{synthesizer_model}", description="Synthesize research")
 ```
 
 Display research complete banner and key findings:
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- GSD-CODEX ► RESEARCH COMPLETE ✓
+ GSD ► RESEARCH COMPLETE ✓
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ## Key Findings
@@ -534,7 +646,7 @@ Files: `.planning/research/`
 Display stage banner:
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- GSD-CODEX ► DEFINING REQUIREMENTS
+ GSD ► DEFINING REQUIREMENTS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
@@ -677,7 +789,7 @@ EOF
 Display stage banner:
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- GSD-CODEX ► CREATING ROADMAP
+ GSD ► CREATING ROADMAP
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ◆ Spawning roadmapper...
@@ -714,7 +826,7 @@ Create roadmap:
 
 Write files first, then return. This ensures artifacts persist even if context is lost.
 </instructions>
-", subagent_type="gsd-roadmapper", description="Create roadmap")
+", subagent_type="gsd-roadmapper", model="{roadmapper_model}", description="Create roadmap")
 ```
 
 **Handle roadmapper return:**
@@ -790,7 +902,7 @@ Use AskUserQuestion:
   Update the roadmap based on feedback. Edit files in place.
   Return ROADMAP REVISED with changes made.
   </revision>
-  ", subagent_type="gsd-roadmapper", description="Revise roadmap")
+  ", subagent_type="gsd-roadmapper", model="{roadmapper_model}", description="Revise roadmap")
   ```
 - Present revised roadmap
 - Loop until user approves
@@ -820,7 +932,7 @@ Present completion with next steps:
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- GSD-CODEX ► PROJECT INITIALIZED ✓
+ GSD ► PROJECT INITIALIZED ✓
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 **[Project Name]**
@@ -841,14 +953,14 @@ Present completion with next steps:
 
 **Phase 1: [Phase Name]** — [Goal from ROADMAP.md]
 
-`/gsd:discuss-phase 1` — gather context and clarify approach
+/gsd:discuss-phase 1 — gather context and clarify approach
 
-<sub>`/clear` first → fresh context window</sub>
+<sub>/clear first → fresh context window</sub>
 
 ---
 
 **Also available:**
-- `/gsd:plan-phase 1` — skip discussion, plan directly
+- /gsd:plan-phase 1 — skip discussion, plan directly
 
 ───────────────────────────────────────────────────────────────
 ```

@@ -7,3 +7,6 @@ TO-DOS.md
 
 # Local test installs
 .claude/
+
+# Build artifacts (committed to npm, not git)
+hooks/dist/

@@ -8,7 +8,7 @@ Use for major workflow transitions.
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- GSD-CODEX ► {STAGE NAME}
+ GSD ► {STAGE NAME}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
@@ -153,7 +153,7 @@ Always at end of major completions.
 
 - Varying box/banner widths
 - Mixing banner styles (`===`, `---`, `***`)
-- Skipping `GSD-CODEX ►` prefix in banners
+- Skipping `GSD ►` prefix in banners
 - Random emoji (`🚀`, `✨`, `💫`)
 - Missing Next Up block after completions
 

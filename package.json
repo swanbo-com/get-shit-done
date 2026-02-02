@@ -12,6 +12,10 @@
     "bin",
     "commands",
     "get-shit-done",
+    "agents",
+    "hooks",
+    "hooks/dist",
+    "scripts",
     "AGENTS.md"
   ],
   "keywords": [
@@ -35,5 +39,9 @@
   },
   "engines": {
     "node": ">=16.7.0"
+  },
+  "scripts": {
+    "build:hooks": "node scripts/build-hooks.js",
+    "prepublishOnly": "npm run build:hooks"
   }
 }

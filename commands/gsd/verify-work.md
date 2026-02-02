@@ -76,7 +76,7 @@ Output this markdown directly (not as a code block). Route based on UAT results:
 **Route A: All tests pass, more phases remain**
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- GSD-CODEX ► PHASE {Z} VERIFIED ✓
+ GSD ► PHASE {Z} VERIFIED ✓
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 **Phase {Z}: {Name}**
@@ -107,7 +107,7 @@ UAT complete ✓
 **Route B: All tests pass, milestone complete**
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- GSD-CODEX ► PHASE {Z} VERIFIED ✓
+ GSD ► PHASE {Z} VERIFIED ✓
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 **Phase {Z}: {Name}**
@@ -137,7 +137,7 @@ Final phase verified ✓
 **Route C: Issues found, fix plans ready**
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- GSD-CODEX ► PHASE {Z} ISSUES FOUND ⚠
+ GSD ► PHASE {Z} ISSUES FOUND ⚠
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 **Phase {Z}: {Name}**
@@ -173,7 +173,7 @@ Fix plans verified ✓
 **Route D: Issues found, planning blocked**
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- GSD-CODEX ► PHASE {Z} BLOCKED ✗
+ GSD ► PHASE {Z} BLOCKED ✗
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 **Phase {Z}: {Name}**
